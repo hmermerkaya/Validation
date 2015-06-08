@@ -13,10 +13,18 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
-
+#include "TMath.h"
 
 #include <iostream>
 using namespace edm;
+
+ bool custom_isnan(double var)
+{
+     volatile double d = var;
+     return d != d;
+
+}
+
 
 TauValidation::TauValidation(const edm::ParameterSet& iPSet): 
  // wmanager_(iPSet,consumesCollector())
@@ -32,7 +40,13 @@ TauValidation::TauValidation(const edm::ParameterSet& iPSet):
 
 
   edm::Service<TFileService> fs;
-    histo_pt_ = fs->make<TH1F> ("Pt", "Pt",100,0,100);
+mass_Z= fs->make<TH1F> ("mass Z", "mass Z", 80,40,150);
+
+mtautau= fs->make<TH1F> ("ditau", "ditau", 80,40,150);
+mtautau11= fs->make<TH1F> ("ditau11", "ditau11", 80,40,150);
+mtautau12= fs->make<TH1F> ("ditau12", "ditau12", 80,40,150);
+mtautau21= fs->make<TH1F> ("ditau21", "ditau21", 80,40,150);
+mtautau22= fs->make<TH1F> ("ditau22", "ditau22", 80,40,150);
 
 
 }
@@ -50,14 +64,16 @@ void TauValidation::analyze(const edm::Event& iEvent,const edm::EventSetup& iSet
   // find taus#system($cmd);
   //
 
-
+//std::cout<<"begin "<<std::endl;
   for (reco::GenParticleCollection::const_iterator iter = genParticles->begin(); iter != genParticles->end(); ++iter) {
-    
+  // std::cout<<iter->pdgId()<<std::endl; 
     if(abs(iter->pdgId())==PdtPdgMini::Z0 || abs(iter->pdgId())==PdtPdgMini::Higgs0){
-     if (!isLastTauinChain(&(*iter))) continue;
-      mmc_method(&(*iter),weight);
+ //    if (!isLastTauinChain(&(*iter))) continue;
+      //std::cout<<" Z ............. "<<std::endl;
+      mmc_method_interface(&(*iter),weight);
     }
   }
+//std::cout<<"end "<<std::endl;
 }//analyze
 
 const reco::GenParticle* TauValidation::GetMother(const reco::GenParticle* tau){
@@ -222,32 +238,25 @@ void TauValidation::countParticles(const reco::GenParticle* p,int &allCount, int
 
 
 
-void TauValidation::mmc_method(const reco::GenParticle* boson, double weight){
-     TLorentzVector taum2(0,0,0,0);
-     TLorentzVector taup2(0,0,0,0);
+void TauValidation::mmc_method_interface(const reco::GenParticle* boson, double weight){
 
 
 
      int ntau(0);
+     bool jak_muon=false;
+     bool jak_pion=false;
      //  std::cout<<"bosons daughters ";
-     for(unsigned int i = 0; i <boson->numberOfDaughters(); i++){
-          const reco::GenParticle *dau=static_cast<const reco::GenParticle*>(boson->daughter(i));
 
+TLorentzVector p4vis1_,p4vis2_,p4miss2_,p4miss1_;
+TLorentzVector sol_p4miss11_,sol_p4miss12_,solv_p4miss21_,sol_p4miss22_;
 
+for(unsigned int i = 0; i <boson->numberOfDaughters(); i++){
+     const reco::GenParticle *dau=static_cast<const reco::GenParticle*>(boson->daughter(i));
 
+     if(ntau==1 && dau->pdgId() == 15)return;
 
-          //std::cout<<dau->pdgId()<<" ";
-          //  if(ntau==1 && dau->pdgId() == 15)return;
-          if(boson->pdgId()!= 15 && abs(dau->pdgId()) == 15) {ntau++;
-               //   Particles.clear();
-               //  Particles.push_back(static_cast<const reco::GenParticle*>(dau));
-               // GetLastSelf(static_cast<const reco::GenParticle*>(dau));
-               //  dau=Particles.back();
-               dau=GetLastSelf2(dau);
+     if(boson->pdgId()!= 15 && abs(dau->pdgId()) == 15) ntau++;
 
-          }
-          if ( dau->pdgId() == 15) taup2.SetXYZT(dau->px(),dau->py(),dau->pz(),dau->energy());
-          if ( dau->pdgId() == -15) taum2.SetXYZT(dau->px(),dau->py(),dau->pz(),dau->energy());
 
      }
      //      std::cout<<"bosons daughters end."<<std::endl;
@@ -266,7 +275,7 @@ void TauValidation::mmc_method(const reco::GenParticle* boson, double weight){
                const reco::GenParticle *dau=static_cast<const reco::GenParticle*>(boson->daughter(i));
 
                int pid = dau->pdgId();
-               //            std::cout<<"hi1................."<<std::endl;
+//                      std::cout<<"hi1................."<<std::endl;
 
                if(abs(findMother(dau)) != 15 && abs(pid) == 15){
 
@@ -278,20 +287,22 @@ void TauValidation::mmc_method(const reco::GenParticle* boson, double weight){
                       */
                     TauDecay_GenParticle TD;
                     unsigned int jak_id, TauBitMask;
-                    //	std::cout<<"hi1................."<<std::endl;
+  //                  	std::cout<<"hi2................."<<std::endl;
                     if(TD.AnalyzeTau(dau,jak_id,TauBitMask,false,false)){
-                         //	std::cout<<"hi2..................."<<std::endl;
+    //                     	std::cout<<"hi3..................."<<std::endl;
                          std::vector<const reco::GenParticle*> part=TD.Get_TauDecayProducts();
 
 
 
 
                          if(jak_id==TauDecay::MODE_MUON){
-
-
-                              std::cout<<"Muonic decay product ids \n";
-                              for(unsigned int i=0; i<part.size();i++) std::cout<< part.at(i)->pdgId()<<" ";
-                              std::cout<<"End Muonic decay "<<std::endl;
+                              jak_muon=true;    
+  //                            std::cout<<"Muonic decay product ids \n";
+                              for(unsigned int i=0; i<part.size();i++) { //std::cout<< part.at(i)->pdgId()<<" ";
+                                   if (fabs(part.at(i)->pdgId())==14 || fabs(part.at(i)->pdgId())==16 ) p4miss2_+=TLorentzVector(part.at(i)->px(),part.at(i)->py(),part.at(i)->pz(),part.at(i)->energy()) ;
+                                   else if (fabs(part.at(i)->pdgId())==13) p4vis2_+=TLorentzVector(part.at(i)->px(),part.at(i)->py(),part.at(i)->pz(),part.at(i)->energy());
+                              }
+    //                          std::cout<<"End Muonic decay "<<std::endl;
 
 
                          }
@@ -300,15 +311,20 @@ void TauValidation::mmc_method(const reco::GenParticle* boson, double weight){
                          }
 
 
-                         //TLorentzVector LVtau(dau->px(),dau->py(),dau->pz(),dau->energy());
 
                          if(jak_id==TauDecay::MODE_PION){
-                              std::cout<<"Pionic decay product ids \n";
+                              jak_pion=true;
+                            //  std::cout<<"Pionic decay product ids \n";
                               for(unsigned int i=0; i<part.size();i++)  {
-                                   std::cout<< part.at(i)->pdgId()<<" ";
-                                   histo_pt_->Fill(part.at(i)->pt());
+                                   if ( fabs(part.at(i)->pdgId())==16 ) p4miss1_+=TLorentzVector(part.at(i)->px(),part.at(i)->py(),part.at(i)->pz(),part.at(i)->energy()) ;
+                                   else if (fabs(part.at(i)->pdgId())==211) p4vis1_+=TLorentzVector(part.at(i)->px(),part.at(i)->py(),part.at(i)->pz(),part.at(i)->energy());
+                              
+                              
+                              
+                              //    std::cout<< part.at(i)->pdgId()<<" ";
+                                //   histo_pt_->Fill(part.at(i)->pt());
                               }
-                              std::cout<<"End Pionic decay "<<std::endl;
+                            // std::cout<<"End Pionic decay "<<std::endl;
                          }
 
 
@@ -325,7 +341,158 @@ void TauValidation::mmc_method(const reco::GenParticle* boson, double weight){
 
      }
 
+     if (jak_muon && jak_pion) {
+          mass_Z->Fill((p4vis1_+p4miss1_+p4vis2_+ p4miss2_).M());
+          std::cout<<"Boom!..  I found the channel interested \n";
+          TH1F mass_dummy_("","",80,50,120);
+          if (mmc_method(p4vis1_,p4miss1_,p4vis2_, p4miss2_,mass_dummy_)) {
+
+               double tautau_m=mass_dummy_.GetBinCenter(mass_dummy_.GetMaximumBin());
+               //mtautau->Fill(tautau_m);
+
+               if (mass_dummy_.Integral()>0){
+//                    mass_dum_count++;
+                    double sum_mass=0,sum_weight=0;
+                    for (int i=mass_dummy_.GetMaximumBin()-2;i<mass_dummy_.GetMaximumBin()+3;i++){
+                         double iweight=mass_dummy_.GetBinContent(i);
+                         sum_weight=sum_weight+iweight;
+                         double mss=mass_dummy_.GetBinCenter(i);
+                         sum_mass=sum_mass+mss*iweight;
+                    }
+
+
+                    mtautau->Fill(sum_mass/sum_weight);
+
+               }
+
+
+
+
+
+
+          }else {
+               std::cout<<"No mmc solutions \n";
+          }
+
 }
+}
+
+//bool mmc_method(const TLorentzVector &p4vis1,const TLorentzVector &p4miss1,const TLorentzVector &p4vis2,const TLorentzVector &p4mis2, TLorentzVector &sol_p4miss11, TLorentzVector &sol_p4miss12, TLorentzVector &solv_p4miss21,TLorentzVector &sol_p4miss22){
+bool  TauValidation::mmc_method(const TLorentzVector &p4vis1,const TLorentzVector &p4miss1,const TLorentzVector &p4vis2,const TLorentzVector &p4miss2, TH1F &mass_dummy) {
+     double p_miss1, phi_miss1, theta_miss1,p_miss2,theta_miss2, phi_miss2;
+     double p_vis1,theta_vis1, phi_vis1;
+     double m_vis1;
+     double m_tau=1.777;
+     double p_vis2,theta_vis2,phi_vis2;
+     double m_vis2;
+     double m_miss2,m_miss1;
+     TLorentzVector p4miss11,p4miss12,p4miss21,p4miss22;
+     
+     
+     p_miss1=p4miss1.P();phi_miss1=p4miss1.Phi();theta_miss1=p4miss1.Theta();
+     p_miss2=p4miss2.P();phi_miss2=p4miss2.Phi();theta_miss2=p4miss2.Theta();
+     p_vis1=p4vis1.P();theta_vis1=p4vis1.Theta(); phi_vis1=p4vis1.Phi();
+     p_vis2=p4vis2.P();theta_vis2=p4vis2.Theta(); phi_vis2=p4vis2.Phi();
+     m_vis1=p4vis1.M();m_vis2=p4vis2.M();
+     m_miss1=0;m_miss2=p4miss2.M();
+     
+     bool check=false;
+     
+     for (float kk=0;kk<1.5;kk+= 0.1)
+          for (float ii=-TMath::Pi();ii<TMath::Pi();ii+=0.1)
+               for (float jj=TMath::Pi();jj>-TMath::Pi();jj-=0.1 ){
+
+
+
+                    //m_miss1=0;
+
+
+
+
+                    phi_miss1=ii;
+                    phi_miss2=jj;
+                    m_miss1=0;
+                    m_miss2=kk;
+
+                    double METX= p_miss1*sin(theta_miss1)*cos(phi_miss1)+p_miss2*sin(theta_miss2)*cos(phi_miss2),METY=p_miss1*sin(theta_miss1)*sin(phi_miss1)+p_miss2*sin(theta_miss2)*sin(phi_miss2);
+                    // METX=Ran.Gaus(METX,fabs(METX*6/100));
+                    //METY=Ran.Gaus(METY,fabs(METY*6/100));
+
+                    double pt_miss1=(-sin(phi_miss2)*METX+cos(phi_miss2)*METY)/sin(phi_miss1-phi_miss2);
+                    double pt_miss2=(sin(phi_miss1)*METX-cos(phi_miss1)*METY)/sin(phi_miss1-phi_miss2);
+
+
+
+
+                    //cout<<"En  "<<p_vis1**2+m_vis1**2<<" "<<p_miss1**2+m_miss1**2<<endl;
+
+
+                    double pz11=(1./(2*(pow(m_vis1,2)+pow(sin(theta_vis1),2)*pow(p_vis1,2))))*(-cos(theta_vis1)*(pow(m_miss1,2)+pow(m_vis1,2)-pow(m_tau,2))*p_vis1+cos(phi_miss1-phi_vis1)*sin(2*theta_vis1)*pow(p_vis1,2)*pt_miss1+sqrt((pow(m_vis1,2)+pow(p_vis1,2))*(pow(m_miss1,4)+pow(pow(m_vis1,2)-pow(m_tau,2),2)+4*     cos(phi_miss1-phi_vis1)*sin(theta_vis1)*(-pow(m_vis1,2)+pow(m_tau,2))*p_vis1*pt_miss1-4*(pow(m_vis1,2)+pow(sin(theta_vis1),2)*pow(sin(phi_miss1-phi_vis1),2)*pow(p_vis1,2))*pow(pt_miss1,2)-2*pow(m_miss1,2)*(pow(m_vis1,2)+pow(m_tau,2)+2*sin(theta_vis1)*p_vis1*(sin(theta_vis1)*p_vis1+cos(phi_miss1-phi_vis1)*pt_miss1)))));
+
+                    double pz12=(-1./(2*(pow(m_vis1,2)+pow(sin(theta_vis1),2)*pow(p_vis1,2))))*(cos(theta_vis1)*(pow(m_miss1,2)+pow(m_vis1,2)-pow(m_tau,2))*p_vis1-cos(phi_miss1-phi_vis1)*sin(2*theta_vis1)*pow(p_vis1,2)*pt_miss1+sqrt((pow(m_vis1,2)+pow(p_vis1,2))*(pow(m_miss1,4)+pow(pow(m_vis1,2)-pow(m_tau,2),2)+4*     cos(phi_miss1-phi_vis1)*sin(theta_vis1)*(-pow(m_vis1,2)+pow(m_tau,2))*p_vis1*pt_miss1-4*(pow(m_vis1,2)+pow(sin(theta_vis1),2)*pow(sin(phi_miss1-phi_vis1),2)*pow(p_vis1,2))*pow(pt_miss1,2)-2*pow(m_miss1,2)*(pow(m_vis1,2)+pow(m_tau,2)+2*sin(theta_vis1)*p_vis1*(sin(theta_vis1)*p_vis1+cos(phi_miss1-phi_vis1)*pt_miss1)))));
+
+                    double pz21=(1./(2*(pow(m_vis2,2)+pow(sin(theta_vis2),2)*pow(p_vis2,2))))*(-cos(theta_vis2)*(pow(m_miss2,2)+pow(m_vis2,2)-pow(m_tau,2))*p_vis2+cos(phi_miss2-phi_vis2)*sin(2*theta_vis2)*pow(p_vis2,2)*pt_miss2+sqrt((pow(m_vis2,2)+pow(p_vis2,2))*(pow(m_miss2,4)+pow(pow(m_vis2,2)-pow(m_tau,2),2)+4*     cos(phi_miss2-phi_vis2)*sin(theta_vis2)*(-pow(m_vis2,2)+pow(m_tau,2))*p_vis2*pt_miss2-4*(pow(m_vis2,2)+pow(sin(theta_vis2),2)*pow(sin(phi_miss2-phi_vis2),2)*pow(p_vis2,2))*pow(pt_miss2,2)-2*pow(m_miss2,2)*(pow(m_vis2,2)+pow(m_tau,2)+2*sin(theta_vis2)*p_vis2*(sin(theta_vis2)*p_vis2+cos(phi_miss2-phi_vis2)*pt_miss2)))));
+
+                    double pz22=(-1./(2*(pow(m_vis2,2)+pow(sin(theta_vis2),2)*pow(p_vis2,2))))*(cos(theta_vis2)*(pow(m_miss2,2)+pow(m_vis2,2)-pow(m_tau,2))*p_vis2-cos(phi_miss2-phi_vis2)*sin(2*theta_vis2)*pow(p_vis2,2)*pt_miss2+sqrt((pow(m_vis2,2)+pow(p_vis2,2))*(pow(m_miss2,4)+pow(pow(m_vis2,2)-pow(m_tau,2),2)+4*     cos(phi_miss2-phi_vis2)*sin(theta_vis2)*(-pow(m_vis2,2)+pow(m_tau,2))*p_vis2*pt_miss2-4*(pow(m_vis2,2)+pow(sin(theta_vis2),2)*pow(sin(phi_miss2-phi_vis2),2)*pow(p_vis2,2))*pow(pt_miss2,2)-2*pow(m_miss2,2)*(pow(m_vis2,2)+pow(m_tau,2)+2*sin(theta_vis2)*p_vis2*(sin(theta_vis2)*p_vis2+cos(phi_miss2-phi_vis2)*pt_miss2)))));
+
+                    //cout<<custom_isnan(pz11)<<" "<<  custom_isnan(pz12)<<" "<<  custom_isnan(pz21) <<" "<<custom_isnan(pz22) <<endl;
+
+                    if (!((custom_isnan(pz11) && custom_isnan(pz12)) || (custom_isnan(pz21) && custom_isnan(pz22)  ))) {
+
+                    //cout<<"Phivalues "<<phi_miss1<<" "<<phi_miss2<<endl;
+
+
+                    //TLorenzVector p4
+                    //cout<<p_vis1<< theta_vis1<<phi_vis1<<m_vis1<<p_miss1<< theta_miss1<<phi_miss1<<m_miss1<<p_vis2<< theta_vis2<<phi_vis2<<m_vis2<<p_miss2<< theta_miss2<<phi_miss2<<m_miss2<<endl;
+
+                    //double zm=sqrt(-2.);
+                    // cout<<" isnan "<<custom_isnan(sqrt(-2.))<<" "<<zm<<endl;
+
+
+
+                    //double p_miss11_cal=sqrt(z11**2-m_miss1**2);double p_miss12_cal=sqrt(z12**2-m_miss1**2);
+
+                    //cout<<"PZ" <<pz1<<endl;     
+                    //   TLorentzVector p4miss11(pt_miss1*cos(phi_miss1),pt_miss1*sin(phi_miss1),pz11,sqrt(pz11**2+pt_miss1**2+m_miss1**2));
+
+ 
+
+                    p4miss11.SetXYZT(pt_miss1*cos(phi_miss1),pt_miss1*sin(phi_miss1),pz11,sqrt(pow(pz11,2)+pow(pt_miss1,2)+pow(m_miss1,2)));
+                    //TLorentzVector p4miss12(pt_miss1*cos(phi_miss1),pt_miss1*sin(phi_miss1),pz12,sqrt(pz12**2+pt_miss1**2+m_miss1**2));
+                    p4miss12.SetXYZT(pt_miss1*cos(phi_miss1),pt_miss1*sin(phi_miss1),pz12,sqrt(pow(pz12,2)+pow(pt_miss1,2)+pow(m_miss1,2)));
+
+                    p4miss21.SetXYZT(pt_miss2*cos(phi_miss2),pt_miss2*sin(phi_miss2),pz21,sqrt(pow(pz21,2)+pow(pt_miss2,2)+pow(m_miss2,2)));
+                    //TLorentzVector p4miss12(pt_miss1*cos(phi_miss1),pt_miss1*sin(phi_miss1),pz12,sqrt(pz12**2+pt_miss1**2+m_miss1**2));
+                    p4miss22.SetXYZT(pt_miss2*cos(phi_miss2),pt_miss2*sin(phi_miss2),pz22,sqrt(pow(pz22,2)+pow(pt_miss2,2)+pow(m_miss2,2)));
+
+                    //p4vis1.SetXYZT(p_vis1*sin(theta_vis1)*cos(phi_vis1),p_vis1*sin(theta_vis1)*sin(phi_vis1), p_vis1*cos(theta_vis1), sqrt(pow(p_vis1,2)+pow(m_vis1,2)));
+                    //p4vis2.SetXYZT(p_vis2*sin(theta_vis2)*cos(phi_vis2),p_vis2*sin(theta_vis2)*sin(phi_vis2), p_vis2*cos(theta_vis2), sqrt(pow(p_vis2,2)+pow(m_vis2,2)));
+
+
+                    mtautau11->Fill((p4vis1+p4miss11 +p4vis2+ p4miss21).M(),DeltaR_had((p4vis1+p4miss11).Pt()).Eval(p4vis1.DeltaR(p4miss11))*DeltaR_lep((p4vis2+p4miss21).Pt()).Eval(p4vis2.DeltaR(p4miss21)));
+                    mtautau12->Fill((p4vis1+p4miss11 +p4vis2+ p4miss22).M(),DeltaR_had((p4vis1+p4miss11).Pt()).Eval(p4vis1.DeltaR(p4miss11))*DeltaR_lep((p4vis2+p4miss22).Pt()).Eval(p4vis2.DeltaR(p4miss22)));
+                    mtautau21->Fill((p4vis1+p4miss12 +p4vis2+ p4miss21).M(),DeltaR_had((p4vis1+p4miss12).Pt()).Eval(p4vis1.DeltaR(p4miss12))*DeltaR_lep((p4vis2+p4miss21).Pt()).Eval(p4vis2.DeltaR(p4miss21)));
+                    mtautau22->Fill((p4vis1+p4miss12 +p4vis2+ p4miss22).M(),DeltaR_had((p4vis1+p4miss12).Pt()).Eval(p4vis1.DeltaR(p4miss12))*DeltaR_lep((p4vis2+p4miss22).Pt()).Eval(p4vis2.DeltaR(p4miss22)));
+
+                    
+                    mass_dummy.Fill((p4vis1+p4miss11 +p4vis2+ p4miss21).M(),DeltaR_had((p4vis1+p4miss11).Pt()).Eval(p4vis1.DeltaR(p4miss11))*DeltaR_lep((p4vis2+p4miss21).Pt()).Eval(p4vis2.DeltaR(p4miss21)));
+                    //      if ((p4vis1+p4miss11 +p4vis2+ p4miss22).M()>50 && (p4vis1+p4miss11 +p4vis2+ p4miss22).M()<140)
+                     mass_dummy.Fill((p4vis1+p4miss11 +p4vis2+ p4miss22).M(),DeltaR_had((p4vis1+p4miss11).Pt()).Eval(p4vis1.DeltaR(p4miss11))*DeltaR_lep((p4vis2+p4miss22).Pt()).Eval(p4vis2.DeltaR(p4miss22)));
+                    //      if ((p4vis1+p4miss12 +p4vis2+ p4miss21).M()>50 && (p4vis1+p4miss12 +p4vis2+ p4miss21).M()<140)
+                     mass_dummy.Fill((p4vis1+p4miss12 +p4vis2+ p4miss21).M(),DeltaR_had((p4vis1+p4miss12).Pt()).Eval(p4vis1.DeltaR(p4miss12))*DeltaR_lep((p4vis2+p4miss21).Pt()).Eval(p4vis2.DeltaR(p4miss21)));
+                    //      if ((p4vis1+p4miss12 +p4vis2+ p4miss22).M()>50 && (p4vis1+p4miss12 +p4vis2+ p4miss22).M()<140)                
+                     mass_dummy.Fill((p4vis1+p4miss12 +p4vis2+ p4miss22).M(),DeltaR_had((p4vis1+p4miss12).Pt()).Eval(p4vis1.DeltaR(p4miss12))*DeltaR_lep((p4vis2+p4miss22).Pt()).Eval(p4vis2.DeltaR(p4miss22)));
+
+
+
+                    check=true;
+                    }
+
+               }
+     return check;
+}
+
+
 
 
 void TauValidation::GetLastSelf(const reco::GenParticle *Particle){
@@ -371,16 +538,221 @@ TLorentzVector TauValidation::motherP4(const reco::GenParticle* tau){
 }
 
 double TauValidation::visibleTauEnergy(const reco::GenParticle* tau){
-  TLorentzVector p4(tau->px(),tau->py(),tau->pz(),tau->energy());
-  for(unsigned int i = 0; i <tau->numberOfDaughters(); i++){
-    const reco::GenParticle *dau=static_cast<const reco::GenParticle*>(tau->daughter(i));
-    int pid = dau->pdgId();
-    if(abs(pid) == 15) return visibleTauEnergy(dau);
-    if(abs(pid) == 12 || abs(pid) == 14 || abs(pid) == 16) {
-      p4-=TLorentzVector(dau->px(),dau->py(),dau->pz(),dau->energy());
-    }
-  }
-  return p4.E();
+     TLorentzVector p4(tau->px(),tau->py(),tau->pz(),tau->energy());
+     for(unsigned int i = 0; i <tau->numberOfDaughters(); i++){
+          const reco::GenParticle *dau=static_cast<const reco::GenParticle*>(tau->daughter(i));
+          int pid = dau->pdgId();
+          if(abs(pid) == 15) return visibleTauEnergy(dau);
+          if(abs(pid) == 12 || abs(pid) == 14 || abs(pid) == 16) {
+               p4-=TLorentzVector(dau->px(),dau->py(),dau->pz(),dau->energy());
+          }
+     }
+     return p4.E();
 }
 
+TF1 TauValidation::DeltaR_had(double pt){
+
+
+
+     TF1 cons2("cons2","pol1",1,66.88);
+
+     // cons2.SetChisquare(7.744005);
+     // cons2.SetNDF(9);
+
+     cons2.SetParameter(0,-0.04697871);
+     //  cons2.SetParError(0,0.06288041);
+
+     cons2.SetParameter(1,0.03170594);
+     //  cons2.SetParError(1,0.001579847);
+
+
+     TF1 MPV("MPV","expo+pol1(2)",1,92.8);
+
+     //  MPV.SetChisquare(36.90687);
+     //  MPV.SetNDF(13);
+
+     MPV.SetParameter(0,-0.5269114);
+     //  MPV.SetParError(0,0.3510341);
+
+     MPV.SetParameter(1,-0.09367247);
+     // MPV.SetParError(1,0.01833037);
+
+     MPV.SetParameter(2,0.112788);
+     //  MPV.SetParError(2,0.009585057);
+
+     MPV.SetParameter(3,-0.0008607203);
+     //  MPV.SetParError(3,0.0001189079);
+
+
+
+
+     TF1 sigma2("sigma2","expo+pol1(2)",10.72,77.68);
+
+     //  sigma2.SetChisquare(48.44186);
+     //  sigma2.SetNDF(10);
+
+     sigma2.SetParameter(0,-2.376518);
+     // sigma2.SetParError(0,0.4077938);
+
+     sigma2.SetParameter(1,-0.1253568);
+     //  sigma2.SetParError(1,0.01940982);
+
+     sigma2.SetParameter(2,0.00586322);
+     //  sigma2.SetParError(2,0.0005587519);
+
+     sigma2.SetParameter(3,-3.839789e-005);
+     //   sigma2.SetParError(3,8.373042e-006);
+
+
+     TF1 total("DeltaR","gaus(0)+landau(3)",0,0.4);
+     Double_t par[6];
+     par[0]=0;
+     par[1]=0;
+     par[2]=0;
+     par[3]=cons2.Eval(pt);
+     par[4]=MPV.Eval(pt);
+     par[5]=sigma2.Eval(pt);
+
+     total.SetParameters(par);
+
+
+
+     return total; 
+
+
+}
+
+
+
+TF1 TauValidation::DeltaR_lep(double pt){
+
+     // TCanvas *c1=new TCanvas();c1.Divide(2,3); 
+     //  c1.cd(1);
+     TF1 cons1 ("cons1","pol1",1,109);
+
+     //  cons1.SetChisquare(18.39828);
+     //   cons1.SetNDF(16);
+
+     cons1.SetParameter(0,-0.0004049933);
+     //  cons1.SetParError(0,0.002755498);
+
+     cons1.SetParameter(1,0.001609134);
+     //  cons1.SetParError(1,6.186914e-005);
+
+
+
+
+     TF1 mean("mean","expo(0)+pol1(2)",10.72,85.24);
+
+     //  mean.SetChisquare(10.05);
+     //  mean.SetNDF(11);
+
+     mean.SetParameter(0,-1.319604);
+     //  mean.SetParError(0,0.2216975);
+
+     mean.SetParameter(1,-0.0698018);
+     //  mean.SetParError(1,0.01949947);
+
+     mean.SetParameter(2,0.05926357);
+     //   mean.SetParError(2,0.01851204);
+
+     mean.SetParameter(3,-0.0004089469);
+     //  mean.SetParError(3,0.0002275216);
+
+
+
+
+     TF1 sigma1("sigma1","expo+pol1(2)",10.72,109);
+
+     // sigma1.SetChisquare(31.74544);
+     // sigma1.SetNDF(14);
+
+     sigma1.SetParameter(0,-2.227225);
+     //   sigma1.SetParError(0,0.08536175);
+
+     sigma1.SetParameter(1,-0.04167413);
+     //  sigma1.SetParError(1,0.009089547);
+
+     sigma1.SetParameter(2,6.679525e-005);
+     //  sigma1.SetParError(2,0.01117666);
+
+     sigma1.SetParameter(3,0.0001051946);
+     //  sigma1.SetParError(3,0.0001027565);
+
+
+
+
+     TF1 cons2 ("cons2","pol1",1,109);
+
+     //  cons2.SetChisquare(53.00084);
+     //  cons2.SetNDF(16);
+
+     cons2.SetParameter(0,-0.03423635);
+     //  cons2.SetParError(0,0.02078572);
+
+     cons2.SetParameter(1,0.008789224);
+     //  cons2.SetParError(1,0.000580261);
+
+
+
+
+     TF1 MPV("MPV","expo+pol1(2)",10.72,96.04);
+
+
+     //  MPV.SetChisquare(4.636014);
+     //  MPV.SetNDF(13);
+
+     MPV.SetParameter(0,-0.8407024);
+     //  MPV.SetParError(0,0.2137112);
+
+     MPV.SetParameter(1,-0.06564579);
+     //   MPV.SetParError(1,0.012763);
+
+     MPV.SetParameter(2,0.07128014);
+     //  MPV.SetParError(2,0.01614891);
+
+     MPV.SetParameter(3,-0.0004138105);
+     //   MPV.SetParError(3,0.0001800071);
+
+
+
+
+     TF1 sigma2("sigma2","expo+pol1(2)",11.8,92.8);
+
+     //  sigma2.SetChisquare(11.9713);
+     //  sigma2.SetNDF(13);
+
+     sigma2.SetParameter(0,-2.364371);
+     //  sigma2.SetParError(0,0.369229);
+
+     sigma2.SetParameter(1,-0.09803685);
+     //  sigma2.SetParError(1,0.01569372);
+
+     sigma2.SetParameter(2,0.01046975);
+     //  sigma2.SetParError(2,0.0007834674);
+
+     sigma2.SetParameter(3,-8.072633e-005);
+     // sigma2.SetParError(3,9.291709e-006);
+
+
+     TF1 total ("DeltaR","gaus(0)+landau(3)",0,1);
+     Double_t par[6];
+     par[0]=cons1.Eval(pt);
+     par[1]=mean.Eval(pt);
+     par[2]=sigma1.Eval(pt);
+     par[3]=cons2.Eval(pt);
+     par[4]=MPV.Eval(pt);
+     par[5]=sigma2.Eval(pt);
+
+     total.SetParameters(par);
+
+
+
+
+
+     return total;
+
+
+
+}
 

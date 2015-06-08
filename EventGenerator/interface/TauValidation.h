@@ -68,8 +68,12 @@ class TauValidation :  public edm::EDAnalyzer
 	int tauDecayChannel(const reco::GenParticle* tau,int jak_id,unsigned int TauBitMask, double weight);
 	int findMother(const reco::GenParticle*);
 	bool isLastTauinChain(const reco::GenParticle* tau);
-	void mmc_method(const reco::GenParticle* boson, double weight);
-	double leadingPionMomentum(const reco::GenParticle*, double weight);
+	void mmc_method_interface(const reco::GenParticle* boson, double weight);
+bool mmc_method(const TLorentzVector &p4vis1,const TLorentzVector &p4miss1,const TLorentzVector &p4vis2,const TLorentzVector &p4mis2, TH1F &mass_dummy);
+	TF1 DeltaR_had(double pt);
+          TF1 DeltaR_lep(double pt);
+          
+          double leadingPionMomentum(const reco::GenParticle*, double weight);
 	double visibleTauEnergy(const reco::GenParticle*);
 	TLorentzVector leadingPionP4(const reco::GenParticle*);
 	TLorentzVector motherP4(const reco::GenParticle*);
@@ -89,8 +93,13 @@ class TauValidation :  public edm::EDAnalyzer
 
   	/// PDT table
   	edm::ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
-  
-         TH1F *histo_pt_;
+         TH1F *mass_Z; 
+         TH1F *mtautau;
+         TH1F *mtautau11;
+         TH1F *mtautau12;
+         TH1F *mtautau21;
+         TH1F *mtautau22;
+         
 	unsigned int NMODEID;
 	int zsbins;
 	double zsmin,zsmax;

@@ -34,8 +34,8 @@ process.source = cms.Source("PoolSource",
 
 
 #process.load("dataset_DYtoJets_8TeV_madgraph_tarball")
-#process.load("dataset_DYtoTauTau_8TeV_pythia6_tauola")
-process.load("dataset_DYtoTauTau_8TeV_pythia6_v2")
+process.load("dataset_DYtoTauTau_8TeV_pythia6_tauola")
+#process.load("dataset_DYtoTauTau_8TeV_pythia6_v2")
 #process.load("dataset_DYtoJets_13TeV_madgraph_pythia8")
 #process.load("dataset_DYtoJets_13TeV_madgraph_pythia8_tauola")
 
@@ -53,7 +53,7 @@ process.options = cms.untracked.PSet(
     wantSummary = cms.untracked.bool(True)
     )    
 process.TFileService = cms.Service("TFileService",
-          fileName = cms.string('dataset_DYtoTauTau_8TeV_pythia6_v2.root')
+          fileName = cms.string('dataset_DYtoTauTau_8TeV_pythia6_tauola.root')
           )
 
 
